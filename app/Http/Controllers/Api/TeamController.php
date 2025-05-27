@@ -7,6 +7,7 @@ use App\Models\Team;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class TeamController extends Controller
 {
@@ -58,10 +59,13 @@ class TeamController extends Controller
      *     security={{"apiAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name"},
-     *             @OA\Property(property="name", type="string", example="Club Deportivo Birrias", description="Nombre del equipo"),
-     *             @OA\Property(property="shield", type="string", example="https://example.com/shield.png", description="URL del escudo del equipo (opcional)")
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"name"},
+     *                 @OA\Property(property="name", type="string", example="Club Deportivo Birrias", description="Nombre del equipo"),
+     *                 @OA\Property(property="shield", type="string", format="binary", description="Imagen del escudo del equipo (opcional)")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -70,7 +74,7 @@ class TeamController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="string", format="uuid"),
      *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="shield", type="string", nullable=true, description="URL del escudo del equipo"),
+     *             @OA\Property(property="shield", type="string", nullable=true, description="URL completa del escudo del equipo"),
      *             @OA\Property(property="players", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="created_at", type="string", format="datetime"),
      *             @OA\Property(property="updated_at", type="string", format="datetime")
@@ -97,13 +101,18 @@ class TeamController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'shield' => 'nullable|string|url|max:500',
+            'shield' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
+
+        $shieldPath = null;
+        if ($request->hasFile('shield')) {
+            $shieldPath = $request->file('shield')->store('team-shields', 'public');
+        }
 
         $team = Team::create([
             'id' => Str::uuid(),
             'name' => $request->name,
-            'shield' => $request->shield,
+            'shield' => $shieldPath,
         ]);
 
         return response()->json($team->load(['players']), 201);
@@ -128,7 +137,7 @@ class TeamController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="string", format="uuid"),
      *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="shield", type="string", nullable=true, description="URL del escudo del equipo"),
+     *             @OA\Property(property="shield", type="string", nullable=true, description="Ruta del archivo del escudo del equipo"),
      *             @OA\Property(property="players", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="tournaments", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="standings", type="array", @OA\Items(type="object")),
@@ -166,10 +175,13 @@ class TeamController extends Controller
      *     ),
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name"},
-     *             @OA\Property(property="name", type="string", example="Club Deportivo Birrias FC", description="Nuevo nombre del equipo"),
-     *             @OA\Property(property="shield", type="string", example="https://example.com/new-shield.png", description="Nueva URL del escudo del equipo (opcional)")
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"name"},
+     *                 @OA\Property(property="name", type="string", example="Club Deportivo Birrias FC", description="Nuevo nombre del equipo"),
+     *                 @OA\Property(property="shield", type="string", format="binary", description="Nueva imagen del escudo del equipo (opcional)")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -178,7 +190,7 @@ class TeamController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="string", format="uuid"),
      *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="shield", type="string", nullable=true, description="URL del escudo del equipo"),
+     *             @OA\Property(property="shield", type="string", nullable=true, description="Ruta del archivo del escudo del equipo"),
      *             @OA\Property(property="players", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="created_at", type="string", format="datetime"),
      *             @OA\Property(property="updated_at", type="string", format="datetime")
@@ -210,10 +222,21 @@ class TeamController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'shield' => 'nullable|string|url|max:500',
+            'shield' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-        $team->update($request->only(['name', 'shield']));
+        $updateData = ['name' => $request->name];
+
+        if ($request->hasFile('shield')) {
+            // Eliminar la imagen anterior si existe
+            if ($team->shield && Storage::disk('public')->exists($team->shield)) {
+                Storage::disk('public')->delete($team->shield);
+            }
+            
+            $updateData['shield'] = $request->file('shield')->store('team-shields', 'public');
+        }
+
+        $team->update($updateData);
 
         return response()->json($team->load(['players']));
     }
@@ -258,6 +281,11 @@ class TeamController extends Controller
      */
     public function destroy(Team $team): JsonResponse
     {
+        // Eliminar la imagen del escudo si existe
+        if ($team->shield && Storage::disk('public')->exists($team->shield)) {
+            Storage::disk('public')->delete($team->shield);
+        }
+        
         $team->delete();
         
         return response()->json(['message' => 'Team deleted successfully']);

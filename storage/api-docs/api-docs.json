@@ -2221,7 +2221,7 @@
                 "requestBody": {
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "name"
@@ -2233,9 +2233,9 @@
                                         "example": "Club Deportivo Birrias"
                                     },
                                     "shield": {
-                                        "description": "URL del escudo del equipo (opcional)",
+                                        "description": "Imagen del escudo del equipo (opcional)",
                                         "type": "string",
-                                        "example": "https://example.com/shield.png"
+                                        "format": "binary"
                                     }
                                 },
                                 "type": "object"
@@ -2258,7 +2258,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "URL del escudo del equipo",
+                                            "description": "Ruta del archivo del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
@@ -2355,7 +2355,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "URL del escudo del equipo",
+                                            "description": "Ruta del archivo del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
@@ -2425,7 +2425,7 @@
                 "requestBody": {
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "name"
@@ -2437,9 +2437,9 @@
                                         "example": "Club Deportivo Birrias FC"
                                     },
                                     "shield": {
-                                        "description": "Nueva URL del escudo del equipo (opcional)",
+                                        "description": "Nueva imagen del escudo del equipo (opcional)",
                                         "type": "string",
-                                        "example": "https://example.com/new-shield.png"
+                                        "format": "binary"
                                     }
                                 },
                                 "type": "object"
@@ -2462,7 +2462,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "URL del escudo del equipo",
+                                            "description": "Ruta del archivo del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
