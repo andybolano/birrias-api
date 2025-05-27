@@ -137,7 +137,7 @@ class TeamController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="string", format="uuid"),
      *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="shield", type="string", nullable=true, description="Ruta del archivo del escudo del equipo"),
+     *             @OA\Property(property="shield", type="string", nullable=true, description="URL completa del escudo del equipo"),
      *             @OA\Property(property="players", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="tournaments", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="standings", type="array", @OA\Items(type="object")),
@@ -190,7 +190,7 @@ class TeamController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="string", format="uuid"),
      *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="shield", type="string", nullable=true, description="Ruta del archivo del escudo del equipo"),
+     *             @OA\Property(property="shield", type="string", nullable=true, description="URL completa del escudo del equipo"),
      *             @OA\Property(property="players", type="array", @OA\Items(type="object")),
      *             @OA\Property(property="created_at", type="string", format="datetime"),
      *             @OA\Property(property="updated_at", type="string", format="datetime")

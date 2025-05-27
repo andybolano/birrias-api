@@ -2258,7 +2258,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "Ruta del archivo del escudo del equipo",
+                                            "description": "URL completa del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
@@ -2355,7 +2355,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "Ruta del archivo del escudo del equipo",
+                                            "description": "URL completa del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
@@ -2462,7 +2462,7 @@
                                             "type": "string"
                                         },
                                         "shield": {
-                                            "description": "Ruta del archivo del escudo del equipo",
+                                            "description": "URL completa del escudo del equipo",
                                             "type": "string",
                                             "nullable": true
                                         },
