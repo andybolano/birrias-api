@@ -50,6 +50,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::middleware(['role:admin'])->group(function () {
         Route::apiResource('players', PlayerController::class);
         Route::post('/players/import', [PlayerController::class, 'import']);
+        Route::post('/players/{player}/teams', [PlayerController::class, 'addToTeam']);
+        Route::delete('/players/{player}/teams', [PlayerController::class, 'removeFromTeam']);
+        Route::post('/players/{player}/teams/check-conflicts', [PlayerController::class, 'checkTournamentConflicts']);
     });
     
     // Match routes - Admin only for create/update/delete

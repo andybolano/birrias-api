@@ -1012,6 +1012,26 @@
                                                         "type": "string",
                                                         "format": "uuid"
                                                     },
+                                                    "first_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "last_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "identification_number": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "eps": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "full_name": {
+                                                        "description": "Nombre completo del jugador",
+                                                        "type": "string"
+                                                    },
                                                     "position": {
                                                         "type": "string",
                                                         "nullable": true
@@ -1096,7 +1116,7 @@
                     "Players"
                 ],
                 "summary": "Crear nuevo jugador",
-                "description": "Crea un nuevo jugador (solo admin)",
+                "description": "Crea un nuevo jugador (solo admin). Un jugador puede estar en varios equipos, pero no en múltiples equipos del mismo torneo.",
                 "operationId": "6362c1d174a02a1f76f4a0f14e45a417",
                 "requestBody": {
                     "required": false,
@@ -1104,6 +1124,30 @@
                         "application/json": {
                             "schema": {
                                 "properties": {
+                                    "first_name": {
+                                        "description": "Nombre del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Juan"
+                                    },
+                                    "last_name": {
+                                        "description": "Apellido del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Pérez"
+                                    },
+                                    "identification_number": {
+                                        "description": "Número de identificación",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "12345678"
+                                    },
+                                    "eps": {
+                                        "description": "EPS del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Sura"
+                                    },
                                     "position": {
                                         "description": "Posición del jugador",
                                         "type": "string",
@@ -1128,6 +1172,12 @@
                                         "type": "string",
                                         "format": "uuid",
                                         "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    },
+                                    "team_id": {
+                                        "description": "ID del equipo al que se asociará el jugador (opcional)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440001"
                                     }
                                 },
                                 "type": "object"
@@ -1145,6 +1195,26 @@
                                         "id": {
                                             "type": "string",
                                             "format": "uuid"
+                                        },
+                                        "first_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "last_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "identification_number": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "eps": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "full_name": {
+                                            "description": "Nombre completo del jugador",
+                                            "type": "string"
                                         },
                                         "position": {
                                             "type": "string",
@@ -1167,6 +1237,12 @@
                                         "person": {
                                             "type": "object",
                                             "nullable": true
+                                        },
+                                        "teams": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
                                         },
                                         "created_at": {
                                             "type": "string",
@@ -1203,10 +1279,33 @@
                         }
                     },
                     "422": {
-                        "description": "Error de validación",
+                        "description": "Error de validación o conflicto de torneo",
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Player cannot be added to this team due to tournament conflicts"
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "tournament_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "team_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "tournament_id": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
                                     "type": "object"
                                 }
                             }
@@ -1250,6 +1349,26 @@
                                         "id": {
                                             "type": "string",
                                             "format": "uuid"
+                                        },
+                                        "first_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "last_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "identification_number": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "eps": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "full_name": {
+                                            "description": "Nombre completo del jugador",
+                                            "type": "string"
                                         },
                                         "position": {
                                             "type": "string",
@@ -1361,6 +1480,30 @@
                         "application/json": {
                             "schema": {
                                 "properties": {
+                                    "first_name": {
+                                        "description": "Nuevo nombre del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Juan Carlos"
+                                    },
+                                    "last_name": {
+                                        "description": "Nuevo apellido del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "González"
+                                    },
+                                    "identification_number": {
+                                        "description": "Nuevo número de identificación",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "87654321"
+                                    },
+                                    "eps": {
+                                        "description": "Nueva EPS del jugador",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Compensar"
+                                    },
                                     "position": {
                                         "description": "Nueva posición del jugador",
                                         "type": "string",
@@ -1385,6 +1528,12 @@
                                         "type": "string",
                                         "format": "uuid",
                                         "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    },
+                                    "team_id": {
+                                        "description": "ID del equipo al que se asociará el jugador (opcional, null para desasociar)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440001"
                                     }
                                 },
                                 "type": "object"
@@ -1402,6 +1551,26 @@
                                         "id": {
                                             "type": "string",
                                             "format": "uuid"
+                                        },
+                                        "first_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "last_name": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "identification_number": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "eps": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "full_name": {
+                                            "description": "Nombre completo del jugador",
+                                            "type": "string"
                                         },
                                         "position": {
                                             "type": "string",
@@ -1424,6 +1593,12 @@
                                         "person": {
                                             "type": "object",
                                             "nullable": true
+                                        },
+                                        "teams": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
                                         },
                                         "created_at": {
                                             "type": "string",
@@ -1560,6 +1735,370 @@
                 ]
             }
         },
+        "/api/players/{id}/teams": {
+            "post": {
+                "tags": [
+                    "Players"
+                ],
+                "summary": "Agregar jugador a equipo",
+                "description": "Agrega un jugador a un equipo específico (solo admin). Valida que el jugador no esté ya en otro equipo del mismo torneo.",
+                "operationId": "4a47a0e2a4c26c963b34ccb264de1b6f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del jugador",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "team_id"
+                                ],
+                                "properties": {
+                                    "team_id": {
+                                        "description": "ID del equipo",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Jugador agregado al equipo exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Player added to team successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos (solo admin)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jugador no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación o conflicto de torneo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Player cannot be added to this team due to tournament conflicts"
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "tournament_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "team_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "tournament_id": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "details": {
+                                            "type": "string",
+                                            "example": "A player cannot be in multiple teams within the same tournament"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Players"
+                ],
+                "summary": "Remover jugador de equipo",
+                "description": "Remueve un jugador de un equipo específico (solo admin)",
+                "operationId": "2e35d63305ce912e39606b3a304fc0f7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del jugador",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "team_id"
+                                ],
+                                "properties": {
+                                    "team_id": {
+                                        "description": "ID del equipo",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Jugador removido del equipo exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Player removed from team successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos (solo admin)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jugador no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación - Equipo no existe",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/players/{id}/teams/check-conflicts": {
+            "post": {
+                "tags": [
+                    "Players"
+                ],
+                "summary": "Verificar conflictos de torneo",
+                "description": "Verifica si un jugador puede ser agregado a un equipo sin violar las reglas de torneo (solo admin)",
+                "operationId": "c150b2ca1229ede01f0be849929aa6c6",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del jugador",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "team_id"
+                                ],
+                                "properties": {
+                                    "team_id": {
+                                        "description": "ID del equipo",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado de la verificación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "can_join": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "conflicts": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "tournament_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "team_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "tournament_id": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Player can be added to this team"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos (solo admin)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jugador no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación - Equipo no existe",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
         "/api/players/import": {
             "post": {
                 "tags": [
@@ -1579,7 +2118,7 @@
                                 ],
                                 "properties": {
                                     "file": {
-                                        "description": "Archivo CSV/Excel con datos de jugadores. Columnas esperadas: position, jersey, birthDay",
+                                        "description": "Archivo CSV/Excel con datos de jugadores. Columnas esperadas: Nombres, apellidos, identificacion, eps, posicion, Numero de camiseta, fecha de nacimiento",
                                         "type": "string",
                                         "format": "binary"
                                     },
@@ -1618,6 +2157,26 @@
                                                     "id": {
                                                         "type": "string",
                                                         "format": "uuid"
+                                                    },
+                                                    "first_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "last_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "identification_number": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "eps": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "full_name": {
+                                                        "description": "Nombre completo del jugador",
+                                                        "type": "string"
                                                     },
                                                     "position": {
                                                         "type": "string",
