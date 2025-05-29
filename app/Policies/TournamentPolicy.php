@@ -38,7 +38,7 @@ class TournamentPolicy
      */
     public function update(User $user, Tournament $tournament): bool
     {
-        return $user->role === 'admin' && $user->id === $tournament->owner;
+        return $user->role === 'admin' && $user->id == $tournament->owner;
     }
 
     /**
@@ -46,7 +46,7 @@ class TournamentPolicy
      */
     public function delete(User $user, Tournament $tournament): bool
     {
-        return $user->role === 'admin' && $user->id === $tournament->owner;
+        return $user->role === 'admin' && $user->id == $tournament->owner;
     }
 
     /**
@@ -54,7 +54,7 @@ class TournamentPolicy
      */
     public function restore(User $user, Tournament $tournament): bool
     {
-        return $user->role === 'admin' && $user->id === $tournament->owner;
+        return $user->role === 'admin' && $user->id == $tournament->owner;
     }
 
     /**
@@ -62,6 +62,6 @@ class TournamentPolicy
      */
     public function forceDelete(User $user, Tournament $tournament): bool
     {
-        return $user->role === 'admin' && $user->id === $tournament->owner;
+        return $user->role === 'admin' && $user->id == $tournament->owner;
     }
 }

@@ -1,325 +1,621 @@
-# Birrias API 🏆
+# 🏆 Birrias Tournament API
 
-API RESTful completa para gestión de torneos de fútbol amateur desarrollada con **Laravel 12** + **Breeze API** + **Sanctum**.
+Sistema completo de gestión de torneos de fútbol con **fases dinámicas configurables**.
 
-## 🚀 Características
+## 🚀 Características Principales
 
-- **Autenticación JWT** con roles (`admin`, `player`)
-- **CRUD completo** para torneos, equipos, jugadores y partidos
-- **Gestión de fixtures** automática por tipo de torneo
-- **Tabla de posiciones** autocalculada
-- **Eventos en vivo** (goles, tarjetas, sustituciones)
-- **Importación de jugadores** desde CSV/Excel
-- **Control de transmisiones** en vivo
-- **API REST** totalmente documentada
+- ✅ **Gestión de Torneos** con configuración dinámica de fases
+- ✅ **Sistema de Fases Flexibles** (Liga, Eliminatorias, Grupos)
+- ✅ **Control de Estados de Fases** (pending, active, completed, cancelled)
+- ✅ **Generación Automática de Fixtures** por fase
+- ✅ **Gestión de Equipos y Jugadores**
+- ✅ **Sistema de Autenticación** con roles (Admin/Player)
+- ✅ **API RESTful** completamente documentada
+- ✅ **Base de datos SQLite** para desarrollo
 
-## 📋 Requisitos
+## 🎯 Sistema de Fases Dinámicas (MVP)
 
-- **PHP 8.2+**
-- **Composer**
-- **PostgreSQL 13+**
-- **Node.js 18+** (opcional, para frontend)
+### Tipos de Fase Disponibles
 
-## 🛠️ Instalación
+| Tipo | Descripción | Parámetros |
+|------|-------------|------------|
+| `round_robin` | Liga - Todos contra todos | `home_away`, `teams_advance` |
+| `single_elimination` | Eliminación directa | `teams_advance`, `home_away` |
+| `groups` | Fase de grupos | `groups_count`, `teams_per_group`, `teams_advance` |
 
-### 1. Clonar el repositorio
+### Estados de Fase
+
+| Estado | Descripción | Color | Acciones |
+|--------|-------------|-------|----------|
+| `pending` | Fase creada, no iniciada | Gris | Generar fixtures, modificar, iniciar |
+| `active` | Fase en curso | Verde | Actualizar resultados, completar |
+| `completed` | Fase finalizada | Azul | Solo consulta (estado final) |
+| `cancelled` | Fase cancelada | Rojo | Solo consulta (estado final) |
+
+### Flujo de Estados
+```
+pending → active → completed
+    ↓        ↓
+cancelled ← cancelled
+```
+
+### Ejemplos de Configuración
+
+#### 🏅 Torneo Estilo Mundial
+```json
+{
+  "phases": [
+    {
+      "name": "Fase de Grupos",
+      "type": "groups",
+      "groups_count": 8,
+      "teams_per_group": 4,
+      "teams_advance": 16
+    },
+    {
+      "name": "Octavos de Final",
+      "type": "single_elimination",
+      "teams_advance": 8,
+      "home_away": false
+    },
+    {
+      "name": "Cuartos de Final",
+      "type": "single_elimination",
+      "teams_advance": 4,
+      "home_away": false
+    },
+    {
+      "name": "Semifinales",
+      "type": "single_elimination",
+      "teams_advance": 2,
+      "home_away": false
+    },
+    {
+      "name": "Final",
+      "type": "single_elimination",
+      "teams_advance": 1,
+      "home_away": false
+    }
+  ]
+}
+```
+
+#### 🏆 Liga + Playoffs
+```json
+{
+  "phases": [
+    {
+      "name": "Temporada Regular",
+      "type": "round_robin",
+      "home_away": true,
+      "teams_advance": 8
+    },
+    {
+      "name": "Playoffs",
+      "type": "single_elimination",
+      "teams_advance": 1,
+      "home_away": true
+    }
+  ]
+}
+```
+
+## 📚 Documentación de la API
+
+### 🔐 Autenticación
 
 ```bash
+# Login
+POST /api/login
+{
+  "email": "admin@birrias.com",
+  "password": "password"
+}
+
+# Respuesta
+{
+  "token": "27|MfMUxunyum3Au2n529xWkKAmB3uzZsay1QB4dZkc7b9150ef",
+  "user": {...}
+}
+```
+
+### 🏟️ Gestión de Torneos
+
+#### Crear Torneo
+```bash
+POST /api/tournaments
+Authorization: Bearer {token}
+{
+  "name": "Copa Birrias 2024",
+  "start_date": "2024-06-01"
+  # El campo "format" es opcional - se recomienda usar "custom" o omitirlo
+  # Las fases se configuran dinámicamente después
+}
+```
+
+#### Listar Torneos
+```bash
+GET /api/tournaments
+Authorization: Bearer {token}
+```
+
+#### Ver Torneo Específico
+```bash
+GET /api/tournaments/{id}
+# Público, no requiere autenticación
+```
+
+### ⚡ Sistema de Fases Dinámicas
+
+#### Obtener Tipos de Fase Disponibles
+```bash
+GET /api/tournament-phase-types
+# Público
+
+# Respuesta
+{
+  "phase_types": [
+    {
+      "value": "round_robin",
+      "label": "Liga (Todos contra Todos)",
+      "description": "Cada equipo juega contra todos los demás equipos. Ideal para ligas regulares.",
+      "supports_home_away": true,
+      "required_fields": [],
+      "optional_fields": ["home_away", "teams_advance"],
+      "example": {
+        "name": "Liga Regular",
+        "type": "round_robin",
+        "home_away": true,
+        "teams_advance": 8
+      }
+    },
+    {
+      "value": "single_elimination",
+      "label": "Eliminación Directa",
+      "description": "Eliminación directa - quien pierde queda eliminado. Ideal para playoffs.",
+      "supports_home_away": true,
+      "required_fields": ["teams_advance"],
+      "optional_fields": ["home_away"],
+      "example": {
+        "name": "Playoffs",
+        "type": "single_elimination",
+        "teams_advance": 8,
+        "home_away": true
+      }
+    },
+    {
+      "value": "groups",
+      "label": "Fase de Grupos",
+      "description": "Los equipos se dividen en grupos y juegan todos contra todos dentro del grupo. Ideal para mundiales.",
+      "supports_home_away": false,
+      "required_fields": ["groups_count", "teams_per_group"],
+      "optional_fields": ["teams_advance"],
+      "example": {
+        "name": "Fase de Grupos",
+        "type": "groups",
+        "groups_count": 4,
+        "teams_per_group": 4,
+        "teams_advance": 8
+      }
+    }
+  ],
+  "note": "MVP simplificado - Solo 3 tipos de fase disponibles",
+  "total_types": 3
+}
+```
+
+#### Listar Fases de un Torneo
+```bash
+GET /api/tournaments/{tournament_id}/phases
+# Público
+
+# Respuesta
+[
+  {
+    "id": "uuid",
+    "phase_number": 1,
+    "name": "Liga Regular",
+    "type": "round_robin",
+    "home_away": true,
+    "teams_advance": 8,
+    "is_active": true,
+    "matches_count": 12
+  }
+]
+```
+
+#### Crear Nueva Fase
+```bash
+POST /api/tournaments/{tournament_id}/phases
+Authorization: Bearer {token}
+
+# Liga Regular
+{
+  "name": "Liga Regular",
+  "type": "round_robin",
+  "home_away": true,
+  "teams_advance": 8
+}
+
+# Playoffs
+{
+  "name": "Playoffs",
+  "type": "single_elimination",
+  "teams_advance": 8,
+  "home_away": true
+}
+
+# Fase de Grupos
+{
+  "name": "Fase de Grupos",
+  "type": "groups",
+  "groups_count": 4,
+  "teams_per_group": 4,
+  "teams_advance": 8
+}
+```
+
+#### Actualizar Fase
+```bash
+PUT /api/tournaments/{tournament_id}/phases/{phase_id}
+Authorization: Bearer {token}
+{
+  "name": "Liga Regular Actualizada",
+  "teams_advance": 6
+}
+```
+
+#### Eliminar Fase
+```bash
+DELETE /api/tournaments/{tournament_id}/phases/{phase_id}
+Authorization: Bearer {token}
+```
+
+#### Generar Fixtures para una Fase
+```bash
+POST /api/tournaments/{tournament_id}/phases/{phase_id}/generate-fixtures
+Authorization: Bearer {token}
+
+# Respuesta
+{
+  "message": "Fixtures generated successfully",
+  "matches_created": 12,
+  "phase_name": "Liga Regular",
+  "phase_type": "round_robin"
+}
+```
+
+### 🎮 Gestión de Estados de Fases
+
+#### Iniciar Fase (pending → active)
+```bash
+POST /api/tournaments/{tournament_id}/phases/{phase_id}/start
+Authorization: Bearer {token}
+
+# Respuesta
+{
+  "message": "Phase started successfully",
+  "phase": {
+    "id": "uuid",
+    "name": "Liga Regular",
+    "status": "active"
+  },
+  "progress": {
+    "total_matches": 12,
+    "completed_matches": 0,
+    "completion_percentage": 0
+  }
+}
+```
+
+#### Completar Fase (active → completed)
+```bash
+POST /api/tournaments/{tournament_id}/phases/{phase_id}/complete
+Authorization: Bearer {token}
+
+# Respuesta
+{
+  "message": "Phase completed successfully",
+  "phase": {
+    "status": "completed"
+  },
+  "progress": {
+    "completion_percentage": 100
+  }
+}
+```
+
+#### Cancelar Fase (pending|active → cancelled)
+```bash
+POST /api/tournaments/{tournament_id}/phases/{phase_id}/cancel
+Authorization: Bearer {token}
+
+# Respuesta
+{
+  "message": "Phase cancelled successfully",
+  "phase": {
+    "status": "cancelled"
+  }
+}
+```
+
+#### Consultar Progreso de Fase
+```bash
+GET /api/tournaments/{tournament_id}/phases/{phase_id}/progress
+# Público
+
+# Respuesta
+{
+  "phase_id": "uuid",
+  "phase_name": "Liga Regular",
+  "phase_status": "active",
+  "progress": {
+    "total_matches": 12,
+    "completed_matches": 8,
+    "scheduled_matches": 4,
+    "completion_percentage": 66.67
+  },
+  "can_be_started": false,
+  "can_be_completed": true,
+  "can_be_cancelled": true,
+  "should_auto_complete": false
+}
+```
+
+### 📅 Consulta de Fixtures
+
+#### Ver Fixtures del Torneo (Organizados por Fases)
+```bash
+GET /api/tournaments/{tournament_id}/fixtures
+# Público
+
+# Parámetros opcionales:
+# ?round=1 - Filtrar por ronda específica
+# ?phase_id=uuid - Filtrar por fase específica
+
+# Respuesta
+{
+  "tournament_id": "uuid",
+  "tournament_name": "Copa Birrias 2024",
+  "total_matches": 26,
+  "total_phases": 2,
+  "phases": [
+    {
+      "phase_id": "uuid",
+      "phase_name": "Liga Regular",
+      "phase_type": "round_robin",
+      "phase_number": 1,
+      "total_matches": 12,
+      "total_rounds": 2,
+      "rounds": [
+        {
+          "round": 1,
+          "matches_count": 6,
+          "matches": [
+            {
+              "id": "uuid",
+              "round": 1,
+              "group_number": null,
+              "match_type": "regular",
+              "home_team": {
+                "id": "uuid",
+                "name": "Arsenal",
+                "shield": "url"
+              },
+              "away_team": {
+                "id": "uuid",
+                "name": "Barcelona",
+                "shield": "url"
+              },
+              "match_date": null,
+              "venue": null,
+              "status": "scheduled",
+              "home_score": 0,
+              "away_score": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 👥 Gestión de Equipos
+
+#### Agregar Equipos al Torneo (Individual)
+```bash
+POST /api/tournaments/{tournament_id}/teams
+Authorization: Bearer {token}
+{
+  "team_id": "uuid"
+}
+```
+
+#### Agregar Múltiples Equipos al Torneo
+```bash
+POST /api/tournaments/{tournament_id}/teams/bulk
+Authorization: Bearer {token}
+{
+  "team_ids": ["uuid1", "uuid2", "uuid3"]
+}
+
+# Respuesta
+{
+  "message": "3 teams added to tournament successfully",
+  "added_count": 3,
+  "skipped_count": 0,
+  "total_teams": 8
+}
+```
+
+#### Listar Equipos
+```bash
+GET /api/teams
+# Público
+
+# Parámetros:
+# ?all=true - Obtener todos los equipos sin paginación
+```
+
+### 🎮 Gestión de Partidos
+
+#### Listar Partidos
+```bash
+GET /api/matches
+# Público
+```
+
+#### Actualizar Resultado de Partido
+```bash
+PUT /api/matches/{match_id}
+Authorization: Bearer {token}
+{
+  "home_score": 2,
+  "away_score": 1,
+  "status": "finished"
+}
+```
+
+## 🛠️ Instalación y Configuración
+
+### Requisitos
+- PHP 8.1+
+- Composer
+- SQLite
+
+### Instalación
+```bash
+# Clonar repositorio
 git clone <repository-url>
 cd birrias-api
-```
 
-### 2. Instalar dependencias
-
-```bash
+# Instalar dependencias
 composer install
-```
 
-### 3. Configurar base de datos
-
-Crea una base de datos PostgreSQL llamada `birrias_db`:
-
-```sql
-CREATE DATABASE birrias_db;
-```
-
-### 4. Configurar variables de entorno
-
-```bash
+# Configurar entorno
 cp .env.example .env
-```
-
-Edita el archivo `.env` con tus credenciales de base de datos:
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=birrias_db
-DB_USERNAME=tu_usuario
-DB_PASSWORD=tu_password
-```
-
-### 5. Generar clave de aplicación
-
-```bash
 php artisan key:generate
-```
 
-### 6. Ejecutar migraciones
-
-```bash
+# Ejecutar migraciones
 php artisan migrate
+
+# Crear usuario admin (opcional)
+php artisan tinker
+User::create([
+    'name' => 'Admin',
+    'email' => 'admin@birrias.com',
+    'password' => Hash::make('password'),
+    'role' => 'admin'
+]);
+
+# Iniciar servidor
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-### 7. Poblar base de datos (opcional)
-
+### Seeders (Opcional)
 ```bash
+# Crear datos de prueba
 php artisan db:seed
 ```
 
-Esto creará:
-- 2 administradores: `admin@birrias.com` / `carlos@birrias.com`
-- 15 jugadores de prueba
-- 12 equipos
-- 3 torneos de ejemplo
-- Datos relacionados
+## 📖 Documentación Swagger
 
-**Contraseña por defecto**: `password`
+La documentación completa de la API está disponible en:
+```
+http://localhost:8000/api/documentation
+```
 
-### 8. Ejecutar servidor
+## 🔄 Flujo de Trabajo Típico
 
+### 1. Crear Torneo con Fases Dinámicas
 ```bash
-php artisan serve
-```
-
-La API estará disponible en: `http://localhost:8000`
-
-## 📚 Documentación de API
-
-### Autenticación
-
-#### Registro
-```http
-POST /register
-Content-Type: application/json
-
+# 1. Crear torneo (sin especificar formato)
+POST /api/tournaments
 {
-    "fullname": "Juan Pérez",
-    "email": "juan@example.com",
-    "password": "password",
-    "password_confirmation": "password",
-    "username": "juan_perez",
-    "phone": "+1234567890",
-    "role": "admin"
+  "name": "Liga Birrias 2024",
+  "start_date": "2024-06-01"
+  # El formato se establece automáticamente como "custom"
 }
-```
 
-#### Login
-```http
-POST /login
-Content-Type: application/json
-
+# 2. Crear primera fase (Liga)
+POST /api/tournaments/{id}/phases
 {
-    "email": "admin@birrias.com",
-    "password": "password"
+  "name": "Temporada Regular",
+  "type": "round_robin",
+  "home_away": true,
+  "teams_advance": 8
 }
-```
 
-**Respuesta:**
-```json
+# 3. Crear segunda fase (Playoffs)
+POST /api/tournaments/{id}/phases
 {
-    "access_token": "1|token...",
-    "token_type": "Bearer",
-    "user": { ... }
+  "name": "Playoffs",
+  "type": "single_elimination",
+  "teams_advance": 1,
+  "home_away": true
 }
-```
 
-### Endpoints Principales
-
-#### Rutas Públicas (sin autenticación)
-- `GET /api/tournaments/{id}` - Ver torneo específico
-- `GET /api/teams` - Listar equipos
-- `GET /api/matches` - Listar partidos
-- `GET /api/standings/tournament/{id}` - Tabla de posiciones
-
-#### Rutas Protegidas (requieren autenticación)
-
-**Header requerido:**
-```
-Authorization: Bearer {token}
-```
-
-##### Torneos (solo admin)
-- `GET /api/tournaments` - Mis torneos
-- `POST /api/tournaments` - Crear torneo
-- `PUT /api/tournaments/{id}` - Actualizar torneo
-- `DELETE /api/tournaments/{id}` - Eliminar torneo
-- `POST /api/tournaments/{id}/teams` - Agregar equipo
-- `DELETE /api/tournaments/{id}/teams` - Quitar equipo
-
-##### Equipos (solo admin)
-- `POST /api/teams` - Crear equipo
-- `PUT /api/teams/{id}` - Actualizar equipo
-- `DELETE /api/teams/{id}` - Eliminar equipo
-- `POST /api/teams/{id}/players` - Agregar jugador
-- `DELETE /api/teams/{id}/players` - Quitar jugador
-
-##### Jugadores (solo admin)
-- `GET /api/players` - Listar jugadores
-- `POST /api/players` - Crear jugador
-- `POST /api/players/import` - Importar desde CSV
-- `PUT /api/players/{id}` - Actualizar jugador
-- `DELETE /api/players/{id}` - Eliminar jugador
-
-##### Partidos (solo admin)
-- `POST /api/matches` - Crear partido
-- `PUT /api/matches/{id}` - Actualizar partido
-- `PATCH /api/matches/{id}/start-live` - Iniciar transmisión
-- `PATCH /api/matches/{id}/finish` - Finalizar partido
-- `POST /api/matches/{id}/events` - Agregar evento
-
-## 🏗️ Estructura de Base de Datos
-
-### Entidades Principales
-
-- **Users**: Usuarios del sistema (admin/jugadores)
-- **Tournaments**: Torneos con diferentes formatos
-- **Teams**: Equipos participantes
-- **Players**: Jugadores con datos personales
-- **Matches**: Partidos con marcadores y estados
-- **MatchEvents**: Eventos dentro del partido
-- **Standings**: Tabla de posiciones autocalculada
-
-### Tipos de Torneo
-
-1. **League**: Liga simple (todos contra todos)
-2. **League Playoffs**: Liga + playoffs finales
-3. **Groups Knockout**: Grupos + eliminación directa
-
-## 🎯 Funcionalidades Avanzadas
-
-### Importación de Jugadores
-
-Formato CSV esperado:
-```csv
-position,jersey,birthDay
-Delantero,10,1995-03-15
-Portero,1,1990-08-22
-```
-
-```http
-POST /api/players/import
-Content-Type: multipart/form-data
-
-file: players.csv
-team_id: uuid-del-equipo
-```
-
-### Eventos en Vivo
-
-```http
-POST /api/matches/{match_id}/events
-Authorization: Bearer {token}
-
+# 4. Agregar equipos
+POST /api/tournaments/{id}/teams/bulk
 {
-    "player_id": "uuid-jugador",
-    "team_id": "uuid-equipo",
-    "event_type": "goal",
-    "minute": 45,
-    "description": "Golazo desde fuera del área"
+  "team_ids": ["uuid1", "uuid2", ...]
 }
+
+# 5. Generar fixtures para cada fase
+POST /api/tournaments/{id}/phases/{phase1_id}/generate-fixtures
+POST /api/tournaments/{id}/phases/{phase2_id}/generate-fixtures
+
+# 6. Consultar fixtures
+GET /api/tournaments/{id}/fixtures
 ```
 
-Tipos de eventos: `goal`, `yellow_card`, `red_card`, `substitution`
-
-### Tabla de Posiciones
-
-Se actualiza automáticamente cuando un partido termina. También se puede recalcular manualmente:
-
-```http
-POST /api/standings/recalculate
-Authorization: Bearer {token}
-
-{
-    "tournament_id": "uuid-torneo"
-}
-```
-
-## 🔐 Roles y Permisos
-
-### Admin
-- Crear/gestionar torneos
-- Gestionar equipos y jugadores
-- Controlar partidos y eventos
-- Acceso total a la API
-
-### Player
-- Ver información pública
-- Acceder a su perfil personal
-- Consultar partidos y torneos
-
-## 🧪 Testing
-
+### 2. Gestión Durante el Torneo
 ```bash
-# Ejecutar tests
-php artisan test
+# Actualizar resultados
+PUT /api/matches/{match_id}
+{
+  "home_score": 2,
+  "away_score": 1,
+  "status": "finished"
+}
 
-# Con coverage
-php artisan test --coverage
+# Ver standings
+GET /api/standings/tournament/{tournament_id}
+
+# Avanzar a siguiente fase (manual por ahora)
+# Los equipos clasificados se determinan según los resultados
 ```
 
-## 🚀 Despliegue
+## 🎯 Casos de Uso Cubiertos
 
-### Producción
+### Liga Simple
+1. **Temporada Regular**: Todos contra todos, ida y vuelta
 
-1. Configurar variables de entorno para producción
-2. Ejecutar migraciones: `php artisan migrate --force`
-3. Limpiar caché: `php artisan config:cache`
-4. Optimizar: `php artisan optimize`
+### Liga con Playoffs
+1. **Temporada Regular**: Todos contra todos, ida y vuelta
+2. **Playoffs**: Los mejores 8 equipos, eliminación directa
 
-### Docker (opcional)
+### Copa Estilo Mundial
+1. **Fase de Grupos**: 8 grupos de 4 equipos
+2. **Octavos**: 16 equipos, eliminación directa
+3. **Cuartos**: 8 equipos, eliminación directa
+4. **Semifinales**: 4 equipos, eliminación directa
+5. **Final**: 2 equipos, partido único
 
-```dockerfile
-# Dockerfile de ejemplo incluido
-docker build -t birrias-api .
-docker run -p 8000:8000 birrias-api
-```
+## 🚨 Notas Importantes
 
-## 🛠️ Stack Tecnológico
+1. **Solo un administrador** puede crear/modificar torneos y fases
+2. **Las fases se ejecutan secuencialmente** según el campo `order`
+3. **Los fixtures se generan automáticamente** según el tipo de fase
+4. **Los equipos que avanzan** se configuran por fase
+5. **Cada fase es independiente** en su configuración
+6. **MVP simplificado**: Solo 3 tipos de fase para mayor simplicidad
 
-- **Backend**: Laravel 12, PHP 8.2+
-- **Autenticación**: Laravel Sanctum + Breeze API
-- **Base de datos**: PostgreSQL
-- **Validación**: Form Requests
-- **Autorización**: Policies + Middleware
-- **Docs**: Postman Collection incluida
+## 📞 Soporte
 
-## 📝 Próximas Funcionalidades
-
-- [ ] Sistema de notificaciones en tiempo real
-- [ ] Generación automática de fixtures
-- [ ] Estadísticas avanzadas de jugadores
-- [ ] API para aplicaciones móviles
-- [ ] Dashboard de administración
-- [ ] Integración con redes sociales
-
-## 🤝 Contribución
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE.md](LICENSE.md) para detalles.
-
-## 🆘 Soporte
-
-Para reportar bugs o solicitar nuevas funcionalidades, por favor crea un [issue](https://github.com/tu-usuario/birrias-api/issues).
+Para soporte técnico o preguntas sobre la implementación, contacta al equipo de desarrollo.
 
 ---
 
-**Desarrollado con ❤️ para la comunidad futbolística amateur**
+**¡El sistema de fases dinámicas simplificado te permite crear los torneos más comunes de forma rápida y sencilla!** 🏆⚽

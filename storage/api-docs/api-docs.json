@@ -2105,7 +2105,7 @@
                     "Players"
                 ],
                 "summary": "Importar jugadores desde CSV/Excel",
-                "description": "Importa múltiples jugadores desde un archivo CSV o Excel y los asocia a un equipo (solo admin)",
+                "description": "Importa múltiples jugadores desde un archivo CSV o Excel y los asocia a un equipo (solo admin). IMPORTANTE: Las identificaciones deben ser únicas tanto en la base de datos como dentro del archivo CSV.",
                 "operationId": "bfefb47ca71a909e200ff902f86cbdb5",
                 "requestBody": {
                     "required": true,
@@ -2118,7 +2118,7 @@
                                 ],
                                 "properties": {
                                     "file": {
-                                        "description": "Archivo CSV/Excel con datos de jugadores. Columnas esperadas: Nombres, apellidos, identificacion, eps, posicion, Numero de camiseta, fecha de nacimiento",
+                                        "description": "Archivo CSV/Excel con datos de jugadores. Columnas esperadas: Nombres, apellidos, identificacion, eps, posicion, Numero de camiseta, fecha de nacimiento. NOTA: Las identificaciones deben ser únicas.",
                                         "type": "string",
                                         "format": "binary"
                                     },
@@ -2143,12 +2143,27 @@
                                     "properties": {
                                         "message": {
                                             "type": "string",
-                                            "example": "Players imported successfully"
+                                            "example": "Importación completada"
                                         },
-                                        "count": {
-                                            "description": "Número de jugadores importados",
+                                        "total_processed": {
+                                            "description": "Total de líneas procesadas",
                                             "type": "integer",
-                                            "example": 15
+                                            "example": 10
+                                        },
+                                        "successful": {
+                                            "description": "Jugadores creados exitosamente",
+                                            "type": "integer",
+                                            "example": 8
+                                        },
+                                        "errors": {
+                                            "description": "Número de errores encontrados",
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "skipped": {
+                                            "description": "Líneas saltadas",
+                                            "type": "integer",
+                                            "example": 1
                                         },
                                         "players": {
                                             "type": "array",
@@ -2202,6 +2217,20 @@
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "error_details": {
+                                            "description": "Detalles de errores encontrados, incluyendo identificaciones duplicadas",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "skipped_details": {
+                                            "description": "Detalles de líneas saltadas (solo si hay líneas saltadas)",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     },
                                     "type": "object"
@@ -2230,19 +2259,153 @@
                         }
                     },
                     "422": {
-                        "description": "Error de validación - Archivo inválido o equipo no existe",
+                        "description": "Error de validación - Archivo inválido, equipo no existe, o identificaciones duplicadas",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Faltan columnas requeridas en el archivo CSV"
+                                                },
+                                                "missing_columns": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "eps",
+                                                        "posicion"
+                                                    ]
+                                                },
+                                                "found_columns": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "Nombres",
+                                                        "apellidos",
+                                                        "identificacion"
+                                                    ]
+                                                },
+                                                "expected_columns": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "Nombres",
+                                                        "apellidos",
+                                                        "identificacion",
+                                                        "eps",
+                                                        "posicion",
+                                                        "Numero de camiseta",
+                                                        "fecha de nacimiento"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
                                         },
-                                        "errors": {
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "El archivo está vacío o no contiene datos válidos"
+                                                },
+                                                "error": {
+                                                    "type": "string",
+                                                    "example": "EMPTY_FILE"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Importación completada"
+                                                },
+                                                "error_details": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "Línea 3: la identificación '12345678' ya existe en la base de datos (Jugador: Juan Pérez)",
+                                                        "Línea 5: la identificación '87654321' está duplicada en el archivo CSV"
+                                                    ]
+                                                }
+                                            },
                                             "type": "object"
                                         }
-                                    },
-                                    "type": "object"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/players/template": {
+            "get": {
+                "tags": [
+                    "Players"
+                ],
+                "summary": "Descargar plantilla CSV para importación",
+                "description": "Descarga un archivo CSV con el formato correcto para importar jugadores (solo admin)",
+                "operationId": "193f84ec67eb991edb45c44f07f4c1f2",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "description": "Tipo de plantilla: 'empty' para plantilla vacía, 'example' para plantilla con ejemplos",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "empty",
+                            "enum": [
+                                "empty",
+                                "example"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Archivo CSV descargado",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos (solo admin)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
                                 }
                             }
                         }
@@ -2740,6 +2903,16 @@
                         "schema": {
                             "type": "string",
                             "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "description": "Obtener todos los equipos sin paginación (true/false)",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "example": true
                         }
                     }
                 ],
@@ -3464,8 +3637,7 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "name",
-                                    "format"
+                                    "name"
                                 ],
                                 "properties": {
                                     "name": {
@@ -3487,31 +3659,38 @@
                                         "example": "USD"
                                     },
                                     "format": {
+                                        "description": "Campo informativo, las fases se configuran dinámicamente",
                                         "type": "string",
                                         "enum": [
                                             "league",
                                             "league_playoffs",
-                                            "groups_knockout"
+                                            "groups_knockout",
+                                            "custom"
                                         ],
-                                        "example": "league"
+                                        "example": "custom"
                                     },
                                     "groups": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "4"
                                     },
                                     "teams_per_group": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "4"
                                     },
                                     "playoff_size": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "8"
                                     },
                                     "rounds": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "2"
                                     },
                                     "home_away": {
+                                        "description": "Campo informativo",
                                         "type": "boolean",
                                         "example": "true"
                                     }
@@ -3722,31 +3901,38 @@
                                         "example": "active"
                                     },
                                     "format": {
+                                        "description": "Campo informativo, las fases se configuran dinámicamente",
                                         "type": "string",
                                         "enum": [
                                             "league",
                                             "league_playoffs",
-                                            "groups_knockout"
+                                            "groups_knockout",
+                                            "custom"
                                         ],
-                                        "example": "league"
+                                        "example": "custom"
                                     },
                                     "groups": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "4"
                                     },
                                     "teams_per_group": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "4"
                                     },
                                     "playoff_size": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "8"
                                     },
                                     "rounds": {
+                                        "description": "Campo informativo",
                                         "type": "integer",
                                         "example": "2"
                                     },
                                     "home_away": {
+                                        "description": "Campo informativo",
                                         "type": "boolean",
                                         "example": "true"
                                     }
@@ -4098,13 +4284,242 @@
                 ]
             }
         },
+        "/api/tournaments/{id}/teams/bulk": {
+            "post": {
+                "tags": [
+                    "Tournaments"
+                ],
+                "summary": "Agregar múltiples equipos al torneo",
+                "description": "Agrega varios equipos existentes al torneo de una sola vez (solo admin propietario)",
+                "operationId": "b5e4efc4b2218306986690f4fbc941d2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "team_ids"
+                                ],
+                                "properties": {
+                                    "team_ids": {
+                                        "description": "Array de IDs de equipos a agregar",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "example": [
+                                            "550e8400-e29b-41d4-a716-446655440000",
+                                            "550e8400-e29b-41d4-a716-446655440001"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Equipos agregados al torneo exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "5 teams added to tournament successfully"
+                                        },
+                                        "added_count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "skipped_count": {
+                                            "description": "Equipos que ya estaban en el torneo",
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "total_teams": {
+                                            "description": "Total de equipos en el torneo después de la operación",
+                                            "type": "integer",
+                                            "example": 7
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos para modificar este torneo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Torneo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tournaments/{id}/generate-fixtures": {
+            "post": {
+                "tags": [
+                    "Tournaments"
+                ],
+                "summary": "Generar fixture del torneo",
+                "description": "Genera automáticamente los partidos del torneo basado en los equipos inscritos y el formato (solo admin propietario)",
+                "operationId": "0d35e1cd466b9b809f9704f8cb7bb0a8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fixture generado exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Fixture generated successfully"
+                                        },
+                                        "matches_created": {
+                                            "type": "integer",
+                                            "example": 15
+                                        },
+                                        "total_rounds": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "format": {
+                                            "type": "string",
+                                            "example": "league"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Error en la generación del fixture",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Not enough teams to generate fixtures"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Sin permisos para modificar este torneo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Torneo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tournaments/formats": {
             "get": {
                 "tags": [
                     "Tournaments"
                 ],
                 "summary": "Obtener formatos de torneo disponibles",
-                "description": "Obtiene la lista de formatos de torneo disponibles con sus parámetros",
+                "description": "Obtiene la lista de formatos de torneo disponibles. NOTA: Con el nuevo sistema de fases dinámicas, se recomienda usar 'custom' y configurar las fases individualmente.",
                 "operationId": "34cc1d70759fa6662cc80f0f50d493d4",
                 "responses": {
                     "200": {
@@ -4119,15 +4534,15 @@
                                                 "properties": {
                                                     "value": {
                                                         "type": "string",
-                                                        "example": "league"
+                                                        "example": "custom"
                                                     },
                                                     "label": {
                                                         "type": "string",
-                                                        "example": "Liga Simple"
+                                                        "example": "Fases Dinámicas"
                                                     },
                                                     "description": {
                                                         "type": "string",
-                                                        "example": "Todos contra todos"
+                                                        "example": "Configuración personalizada usando fases dinámicas"
                                                     },
                                                     "required_params": {
                                                         "type": "array",
@@ -4140,6 +4555,10 @@
                                                         "items": {
                                                             "type": "string"
                                                         }
+                                                    },
+                                                    "deprecated": {
+                                                        "type": "boolean",
+                                                        "example": false
                                                     }
                                                 },
                                                 "type": "object"
@@ -4147,6 +4566,364 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tournaments/{id}/fixtures": {
+            "get": {
+                "tags": [
+                    "Tournaments"
+                ],
+                "summary": "Obtener fixture del torneo",
+                "description": "Obtiene todos los partidos del torneo organizados por ronda",
+                "operationId": "bf5c7e5d8343bfd853c056aa3dcb9d55",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "round",
+                        "in": "query",
+                        "description": "Filtrar por ronda específica",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fixture del torneo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "tournament_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "tournament_name": {
+                                            "type": "string"
+                                        },
+                                        "format": {
+                                            "type": "string"
+                                        },
+                                        "total_matches": {
+                                            "type": "integer"
+                                        },
+                                        "total_rounds": {
+                                            "type": "integer"
+                                        },
+                                        "rounds": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "round": {
+                                                        "type": "integer"
+                                                    },
+                                                    "matches_count": {
+                                                        "type": "integer"
+                                                    },
+                                                    "matches": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "string",
+                                                                    "format": "uuid"
+                                                                },
+                                                                "round": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "home_team": {
+                                                                    "type": "object"
+                                                                },
+                                                                "away_team": {
+                                                                    "type": "object"
+                                                                },
+                                                                "match_date": {
+                                                                    "type": "string",
+                                                                    "format": "datetime",
+                                                                    "nullable": true
+                                                                },
+                                                                "venue": {
+                                                                    "type": "string",
+                                                                    "nullable": true
+                                                                },
+                                                                "status": {
+                                                                    "type": "string"
+                                                                },
+                                                                "home_score": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "away_score": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Torneo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tournaments/{tournament_id}/phases": {
+            "get": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Listar fases del torneo",
+                "description": "Obtiene todas las fases configuradas para un torneo",
+                "operationId": "2ab4e766b2c211ddaf712423ca0b18be",
+                "parameters": [
+                    {
+                        "name": "tournament_id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de fases del torneo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Crear nueva fase",
+                "description": "Crea una nueva fase para el torneo (solo admin propietario)",
+                "operationId": "a2cc34972e44c1704307c83305df8b5b",
+                "parameters": [
+                    {
+                        "name": "tournament_id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "type"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Fase de Grupos"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "round_robin",
+                                            "single_elimination",
+                                            "double_elimination",
+                                            "groups",
+                                            "playoffs"
+                                        ],
+                                        "example": "round_robin"
+                                    },
+                                    "home_away": {
+                                        "type": "boolean",
+                                        "example": false
+                                    },
+                                    "teams_advance": {
+                                        "type": "integer",
+                                        "example": 8
+                                    },
+                                    "groups_count": {
+                                        "type": "integer",
+                                        "example": 4
+                                    },
+                                    "teams_per_group": {
+                                        "type": "integer",
+                                        "example": 4
+                                    },
+                                    "config": {
+                                        "type": "object",
+                                        "example": {
+                                            "rounds": 1,
+                                            "custom_setting": "value"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Fase creada exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tournaments/{tournament_id}/phases/{phase_id}": {
+            "put": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Actualizar fase",
+                "description": "Actualiza una fase existente (solo admin propietario)",
+                "operationId": "2158af7fd976669611795efc0b88fe03",
+                "parameters": [
+                    {
+                        "name": "tournament_id",
+                        "in": "path",
+                        "description": "ID del torneo",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "phase_id",
+                        "in": "path",
+                        "description": "ID de la fase",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fase actualizada exitosamente"
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Eliminar fase",
+                "description": "Elimina una fase del torneo (solo admin propietario)",
+                "operationId": "1298017d76ed55dfbebe3a903f1529e7",
+                "responses": {
+                    "200": {
+                        "description": "Fase eliminada exitosamente"
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tournaments/{tournament_id}/phases/{phase_id}/generate-fixtures": {
+            "post": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Generar fixtures para una fase",
+                "description": "Genera los partidos para una fase específica (solo admin propietario)",
+                "operationId": "ea4372d7c761206ccd9ce6f51af36f8f",
+                "responses": {
+                    "200": {
+                        "description": "Fixtures generados exitosamente"
+                    }
+                },
+                "security": [
+                    {
+                        "apiAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tournament-phase-types": {
+            "get": {
+                "tags": [
+                    "Tournament Phases"
+                ],
+                "summary": "Obtener tipos de fase disponibles",
+                "description": "Obtiene la lista de tipos de fase disponibles con sus configuraciones",
+                "operationId": "5bc30a439a2cc5a5cad618f3468785c5",
+                "responses": {
+                    "200": {
+                        "description": "Lista de tipos de fase disponibles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
@@ -4759,6 +5536,10 @@
         {
             "name": "Standings",
             "description": "Tabla de posiciones"
+        },
+        {
+            "name": "Tournament Phases",
+            "description": "Tournament Phases"
         }
     ]
 }

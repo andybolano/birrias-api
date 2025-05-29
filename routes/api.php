@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\TournamentController;
+use App\Http\Controllers\Api\TournamentPhaseController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\MatchController;
@@ -17,7 +18,11 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
 
 // Public routes (no auth required)
 Route::get('/tournaments/formats', [TournamentController::class, 'getFormats']);
+Route::get('/tournament-phase-types', [TournamentPhaseController::class, 'getPhaseTypes']);
 Route::get('/tournaments/{tournament}', [TournamentController::class, 'show']);
+Route::get('/tournaments/{tournament}/fixtures', [TournamentController::class, 'getFixtures']);
+Route::get('/tournaments/{tournament}/phases', [TournamentPhaseController::class, 'index']);
+Route::get('/tournaments/{tournament}/phases/{phase}/progress', [TournamentPhaseController::class, 'getPhaseProgress']);
 Route::get('/teams', [TeamController::class, 'index']);
 Route::get('/teams/{team}', [TeamController::class, 'show']);
 Route::get('/matches', [MatchController::class, 'index']);
@@ -32,8 +37,19 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Tournament routes - Admin only for create/update/delete
     Route::middleware(['role:admin'])->group(function () {
         Route::apiResource('tournaments', TournamentController::class)->except(['show', 'index']);
+        Route::post('/tournaments/{tournament}/teams/bulk', [TournamentController::class, 'addMultipleTeams']);
         Route::post('/tournaments/{tournament}/teams', [TournamentController::class, 'addTeam']);
         Route::delete('/tournaments/{tournament}/teams', [TournamentController::class, 'removeTeam']);
+        Route::post('/tournaments/{tournament}/generate-fixtures', [TournamentController::class, 'generateFixtures']);
+        
+        // Tournament Phases routes
+        Route::apiResource('tournaments.phases', TournamentPhaseController::class)->except(['show', 'index']);
+        Route::post('/tournaments/{tournament}/phases/{phase}/generate-fixtures', [TournamentPhaseController::class, 'generateFixtures']);
+        
+        // Phase status management routes
+        Route::post('/tournaments/{tournament}/phases/{phase}/start', [TournamentPhaseController::class, 'startPhase']);
+        Route::post('/tournaments/{tournament}/phases/{phase}/complete', [TournamentPhaseController::class, 'completePhase']);
+        Route::post('/tournaments/{tournament}/phases/{phase}/cancel', [TournamentPhaseController::class, 'cancelPhase']);
     });
     
     // Get user's tournaments (admin only)
@@ -48,11 +64,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
     
     // Player routes - Admin only for create/update/delete
     Route::middleware(['role:admin'])->group(function () {
-        Route::apiResource('players', PlayerController::class);
+        // Specific routes MUST come before apiResource to avoid conflicts
+        Route::get('/players/template', [PlayerController::class, 'downloadTemplate']);
         Route::post('/players/import', [PlayerController::class, 'import']);
         Route::post('/players/{player}/teams', [PlayerController::class, 'addToTeam']);
         Route::delete('/players/{player}/teams', [PlayerController::class, 'removeFromTeam']);
         Route::post('/players/{player}/teams/check-conflicts', [PlayerController::class, 'checkTournamentConflicts']);
+        
+        // apiResource routes come last
+        Route::apiResource('players', PlayerController::class);
     });
     
     // Match routes - Admin only for create/update/delete

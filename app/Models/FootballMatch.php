@@ -15,7 +15,10 @@ class FootballMatch extends Model
 
     protected $fillable = [
         'tournament_id',
+        'phase_id',
         'round',
+        'group_number',
+        'match_type',
         'home_team',
         'away_team',
         'match_date',
@@ -30,12 +33,18 @@ class FootballMatch extends Model
         'match_date' => 'datetime',
         'home_score' => 'integer',
         'away_score' => 'integer',
-        'round' => 'integer'
+        'round' => 'integer',
+        'group_number' => 'integer'
     ];
 
     public function tournament(): BelongsTo
     {
         return $this->belongsTo(Tournament::class);
+    }
+
+    public function phase(): BelongsTo
+    {
+        return $this->belongsTo(TournamentPhase::class, 'phase_id');
     }
 
     public function homeTeam(): BelongsTo

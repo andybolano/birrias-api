@@ -625,7 +625,7 @@ class PlayerController extends Controller
      *     path="/api/players/import",
      *     tags={"Players"},
      *     summary="Importar jugadores desde CSV/Excel",
-     *     description="Importa múltiples jugadores desde un archivo CSV o Excel y los asocia a un equipo (solo admin)",
+     *     description="Importa múltiples jugadores desde un archivo CSV o Excel y los asocia a un equipo (solo admin). IMPORTANTE: Las identificaciones deben ser únicas tanto en la base de datos como dentro del archivo CSV.",
      *     security={{"apiAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
@@ -637,7 +637,7 @@ class PlayerController extends Controller
      *                     property="file",
      *                     type="string",
      *                     format="binary",
-     *                     description="Archivo CSV/Excel con datos de jugadores. Columnas esperadas: Nombres, apellidos, identificacion, eps, posicion, Numero de camiseta, fecha de nacimiento"
+     *                     description="Archivo CSV/Excel con datos de jugadores. Columnas esperadas: Nombres, apellidos, identificacion, eps, posicion, Numero de camiseta, fecha de nacimiento. NOTA: Las identificaciones deben ser únicas."
      *                 ),
      *                 @OA\Property(
      *                     property="team_id",
@@ -653,8 +653,11 @@ class PlayerController extends Controller
      *         response=201,
      *         description="Jugadores importados exitosamente",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Players imported successfully"),
-     *             @OA\Property(property="count", type="integer", example=15, description="Número de jugadores importados"),
+     *             @OA\Property(property="message", type="string", example="Importación completada"),
+     *             @OA\Property(property="total_processed", type="integer", example=10, description="Total de líneas procesadas"),
+     *             @OA\Property(property="successful", type="integer", example=8, description="Jugadores creados exitosamente"),
+     *             @OA\Property(property="errors", type="integer", example=1, description="Número de errores encontrados"),
+     *             @OA\Property(property="skipped", type="integer", example=1, description="Líneas saltadas"),
      *             @OA\Property(
      *                 property="players",
      *                 type="array",
@@ -671,6 +674,18 @@ class PlayerController extends Controller
      *                     @OA\Property(property="created_at", type="string", format="datetime"),
      *                     @OA\Property(property="updated_at", type="string", format="datetime")
      *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="error_details",
+     *                 type="array",
+     *                 @OA\Items(type="string"),
+     *                 description="Detalles de errores encontrados, incluyendo identificaciones duplicadas"
+     *             ),
+     *             @OA\Property(
+     *                 property="skipped_details",
+     *                 type="array",
+     *                 @OA\Items(type="string"),
+     *                 description="Detalles de líneas saltadas (solo si hay líneas saltadas)"
      *             )
      *         )
      *     ),
@@ -686,10 +701,24 @@ class PlayerController extends Controller
      *     ),
      *     @OA\Response(
      *         response=422,
-     *         description="Error de validación - Archivo inválido o equipo no existe",
+     *         description="Error de validación - Archivo inválido, equipo no existe, o identificaciones duplicadas",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string"),
-     *             @OA\Property(property="errors", type="object")
+     *             oneOf={
+     *                 @OA\Schema(
+     *                     @OA\Property(property="message", type="string", example="Faltan columnas requeridas en el archivo CSV"),
+     *                     @OA\Property(property="missing_columns", type="array", @OA\Items(type="string"), example={"eps", "posicion"}),
+     *                     @OA\Property(property="found_columns", type="array", @OA\Items(type="string"), example={"Nombres", "apellidos", "identificacion"}),
+     *                     @OA\Property(property="expected_columns", type="array", @OA\Items(type="string"), example={"Nombres", "apellidos", "identificacion", "eps", "posicion", "Numero de camiseta", "fecha de nacimiento"})
+     *                 ),
+     *                 @OA\Schema(
+     *                     @OA\Property(property="message", type="string", example="El archivo está vacío o no contiene datos válidos"),
+     *                     @OA\Property(property="error", type="string", example="EMPTY_FILE")
+     *                 ),
+     *                 @OA\Schema(
+     *                     @OA\Property(property="message", type="string", example="Importación completada"),
+     *                     @OA\Property(property="error_details", type="array", @OA\Items(type="string"), example={"Línea 3: la identificación '12345678' ya existe en la base de datos (Jugador: Juan Pérez)", "Línea 5: la identificación '87654321' está duplicada en el archivo CSV"})
+     *                 )
+     *             }
      *         )
      *     )
      * )
@@ -703,10 +732,34 @@ class PlayerController extends Controller
 
         $file = $request->file('file');
         $content = file_get_contents($file->getRealPath());
+        
+        // Detectar y manejar diferentes tipos de salto de línea
+        $content = str_replace(["\r\n", "\r"], "\n", $content);
         $lines = explode("\n", $content);
         
+        // Filtrar líneas vacías
+        $lines = array_filter($lines, function($line) {
+            return !empty(trim($line));
+        });
+        
+        if (empty($lines)) {
+            return response()->json([
+                'message' => 'El archivo está vacío o no contiene datos válidos',
+                'error' => 'EMPTY_FILE'
+            ], 422);
+        }
+        
         $players = [];
-        $header = str_getcsv(array_shift($lines));
+        $errors = [];
+        $skipped = [];
+        $processedIdentifications = []; // Para rastrear identificaciones en el archivo actual
+        
+        // Obtener header
+        $headerLine = array_shift($lines);
+        $header = str_getcsv($headerLine);
+        
+        // Limpiar headers (remover espacios y caracteres especiales)
+        $header = array_map('trim', $header);
         
         // Mapeo de columnas del CSV a campos del modelo
         $columnMapping = [
@@ -719,51 +772,220 @@ class PlayerController extends Controller
             'fecha de nacimiento' => 'birthDay'
         ];
         
-        foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
-            
-            $data = str_getcsv($line);
-            $playerData = array_combine($header, $data);
-            
-            // Mapear datos usando el mapeo de columnas
-            $mappedData = [];
-            foreach ($columnMapping as $csvColumn => $modelField) {
-                $mappedData[$modelField] = $playerData[$csvColumn] ?? null;
+        // Verificar que todas las columnas requeridas estén presentes
+        $missingColumns = [];
+        foreach ($columnMapping as $csvColumn => $modelField) {
+            if (!in_array($csvColumn, $header)) {
+                $missingColumns[] = $csvColumn;
             }
-            
-            // Limpiar y formatear datos
-            if (!empty($mappedData['jersey'])) {
-                $mappedData['jersey'] = (int) $mappedData['jersey'];
-            }
-            
-            if (!empty($mappedData['birthDay'])) {
-                try {
-                    $mappedData['birthDay'] = date('Y-m-d', strtotime($mappedData['birthDay']));
-                } catch (Exception $e) {
-                    $mappedData['birthDay'] = null;
-                }
-            }
-            
-            $player = Player::create([
-                'id' => Str::uuid(),
-                'first_name' => $mappedData['first_name'],
-                'last_name' => $mappedData['last_name'],
-                'identification_number' => $mappedData['identification_number'],
-                'eps' => $mappedData['eps'],
-                'position' => $mappedData['position'],
-                'jersey' => $mappedData['jersey'],
-                'birthDay' => $mappedData['birthDay'],
-            ]);
-            
-            // Associate with team
-            $player->teams()->attach($request->team_id);
-            $players[] = $player;
         }
         
-        return response()->json([
-            'message' => 'Players imported successfully',
-            'count' => count($players),
+        if (!empty($missingColumns)) {
+            return response()->json([
+                'message' => 'Faltan columnas requeridas en el archivo CSV',
+                'missing_columns' => $missingColumns,
+                'found_columns' => $header,
+                'expected_columns' => array_keys($columnMapping)
+            ], 422);
+        }
+        
+        foreach ($lines as $lineNumber => $line) {
+            $lineNumber += 2; // +2 porque empezamos desde línea 2 (después del header)
+            
+            if (empty(trim($line))) {
+                $skipped[] = "Línea {$lineNumber}: línea vacía";
+                continue;
+            }
+            
+            try {
+                $data = str_getcsv($line);
+                
+                // Verificar que el número de columnas coincida
+                if (count($data) !== count($header)) {
+                    $errors[] = "Línea {$lineNumber}: número de columnas incorrecto. Esperado: " . count($header) . ", encontrado: " . count($data);
+                    continue;
+                }
+                
+                $playerData = array_combine($header, $data);
+                
+                if ($playerData === false) {
+                    $errors[] = "Línea {$lineNumber}: error al combinar datos con headers";
+                    continue;
+                }
+                
+                // Mapear datos usando el mapeo de columnas
+                $mappedData = [];
+                foreach ($columnMapping as $csvColumn => $modelField) {
+                    $value = isset($playerData[$csvColumn]) ? trim($playerData[$csvColumn]) : null;
+                    $mappedData[$modelField] = empty($value) ? null : $value;
+                }
+                
+                // Validar que al menos tenga nombre o apellido
+                if (empty($mappedData['first_name']) && empty($mappedData['last_name'])) {
+                    $skipped[] = "Línea {$lineNumber}: sin nombre ni apellido";
+                    continue;
+                }
+                
+                // VALIDACIÓN DE IDENTIFICACIÓN ÚNICA
+                if (!empty($mappedData['identification_number'])) {
+                    $identificationNumber = $mappedData['identification_number'];
+                    
+                    // Verificar si ya existe en la base de datos
+                    $existingPlayer = Player::where('identification_number', $identificationNumber)->first();
+                    if ($existingPlayer) {
+                        $errors[] = "Línea {$lineNumber}: la identificación '{$identificationNumber}' ya existe en la base de datos (Jugador: {$existingPlayer->full_name})";
+                        continue;
+                    }
+                    
+                    // Verificar si ya se procesó en este archivo
+                    if (in_array($identificationNumber, $processedIdentifications)) {
+                        $errors[] = "Línea {$lineNumber}: la identificación '{$identificationNumber}' está duplicada en el archivo CSV";
+                        continue;
+                    }
+                    
+                    // Agregar a la lista de identificaciones procesadas
+                    $processedIdentifications[] = $identificationNumber;
+                }
+                
+                // Limpiar y formatear datos
+                if (!empty($mappedData['jersey'])) {
+                    if (is_numeric($mappedData['jersey'])) {
+                        $mappedData['jersey'] = (int) $mappedData['jersey'];
+                    } else {
+                        $errors[] = "Línea {$lineNumber}: número de camiseta inválido: {$mappedData['jersey']}";
+                        continue;
+                    }
+                }
+                
+                if (!empty($mappedData['birthDay'])) {
+                    try {
+                        $date = date('Y-m-d', strtotime($mappedData['birthDay']));
+                        if ($date === '1970-01-01') { // strtotime falló
+                            $mappedData['birthDay'] = null;
+                            $errors[] = "Línea {$lineNumber}: fecha de nacimiento inválida: {$mappedData['birthDay']}";
+                        } else {
+                            $mappedData['birthDay'] = $date;
+                        }
+                    } catch (Exception $e) {
+                        $mappedData['birthDay'] = null;
+                        $errors[] = "Línea {$lineNumber}: error al procesar fecha: {$e->getMessage()}";
+                    }
+                }
+                
+                $player = Player::create([
+                    'id' => Str::uuid(),
+                    'first_name' => $mappedData['first_name'],
+                    'last_name' => $mappedData['last_name'],
+                    'identification_number' => $mappedData['identification_number'],
+                    'eps' => $mappedData['eps'],
+                    'position' => $mappedData['position'],
+                    'jersey' => $mappedData['jersey'],
+                    'birthDay' => $mappedData['birthDay'],
+                ]);
+                
+                // Associate with team
+                $player->teams()->attach($request->team_id);
+                $players[] = $player;
+                
+            } catch (Exception $e) {
+                $errors[] = "Línea {$lineNumber}: error inesperado: {$e->getMessage()}";
+                continue;
+            }
+        }
+        
+        $response = [
+            'message' => 'Importación completada',
+            'total_processed' => count($lines),
+            'successful' => count($players),
+            'errors' => count($errors),
+            'skipped' => count($skipped),
             'players' => $players
-        ], 201);
+        ];
+        
+        if (!empty($errors)) {
+            $response['error_details'] = $errors;
+        }
+        
+        if (!empty($skipped)) {
+            $response['skipped_details'] = $skipped;
+        }
+        
+        return response()->json($response, 201);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/players/template",
+     *     tags={"Players"},
+     *     summary="Descargar plantilla CSV para importación",
+     *     description="Descarga un archivo CSV con el formato correcto para importar jugadores (solo admin)",
+     *     security={{"apiAuth":{}}},
+     *     @OA\Parameter(
+     *         name="type",
+     *         in="query",
+     *         description="Tipo de plantilla: 'empty' para plantilla vacía, 'example' para plantilla con ejemplos",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"empty", "example"}, default="empty")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Archivo CSV descargado",
+     *         @OA\MediaType(
+     *             mediaType="text/csv",
+     *             @OA\Schema(type="string", format="binary")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="No autenticado",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorResponse")
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Sin permisos (solo admin)",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorResponse")
+     *     )
+     * )
+     */
+    public function downloadTemplate(Request $request)
+    {
+        $type = $request->get('type', 'empty');
+        
+        // Generar contenido CSV dinámicamente para evitar problemas de archivos
+        $headers = [
+            'Nombres',
+            'apellidos', 
+            'identificacion',
+            'eps',
+            'posicion',
+            'Numero de camiseta',
+            'fecha de nacimiento'
+        ];
+        
+        $csvContent = implode(',', $headers) . "\n";
+        
+        if ($type === 'example') {
+            // Agregar datos de ejemplo
+            $examples = [
+                ['Juan Carlos', 'García López', '12345678', 'Sura', 'Delantero', '10', '1995-03-15'],
+                ['María Elena', 'Rodríguez Silva', '87654321', 'Compensar', 'Mediocampista', '8', '1997-07-22'],
+                ['Pedro Antonio', 'Martínez Ruiz', '11223344', 'Nueva EPS', 'Defensa', '4', '1993-11-08']
+            ];
+            
+            foreach ($examples as $example) {
+                $csvContent .= implode(',', $example) . "\n";
+            }
+            
+            $filename = 'plantilla-jugadores-con-ejemplos.csv';
+        } else {
+            $filename = 'plantilla-jugadores-vacia.csv';
+        }
+        
+        return response($csvContent)
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 }

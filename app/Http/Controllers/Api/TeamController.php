@@ -24,6 +24,13 @@ class TeamController extends Controller
      *         required=false,
      *         @OA\Schema(type="string", format="uuid")
      *     ),
+     *     @OA\Parameter(
+     *         name="all",
+     *         in="query",
+     *         description="Obtener todos los equipos sin paginación (true/false)",
+     *         required=false,
+     *         @OA\Schema(type="boolean", example=true)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Lista de equipos",
@@ -45,6 +52,13 @@ class TeamController extends Controller
             });
         }
 
+        // Si se solicita todos los equipos sin paginación
+        if ($request->boolean('all')) {
+            $teams = $query->orderBy('name')->get();
+            return response()->json($teams);
+        }
+
+        // Paginación por defecto
         $teams = $query->orderBy('name')->paginate(15);
 
         return response()->json($teams);
