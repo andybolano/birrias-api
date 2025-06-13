@@ -100,3 +100,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         return response()->json($request->user());
     });
 });
+
+// Health check endpoint for Render.com
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now(),
+        'service' => 'Birrias API'
+    ]);
+});

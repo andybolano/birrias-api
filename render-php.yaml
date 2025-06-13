@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: birrias-api-php
+    env: php
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: "./build.sh"
+    startCommand: "heroku-php-apache2 public/"
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_NAME
+        value: "Birrias API"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        fromService:
+          type: web
+          name: birrias-api-php
+          property: host
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: database/database.sqlite
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: CACHE_DRIVER
+        value: file
+      - key: SESSION_DRIVER
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: BROADCAST_DRIVER
+        value: log
+      - key: MAIL_MAILER
+        value: log
+      - key: APP_KEY
+        generateValue: true 
