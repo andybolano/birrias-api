@@ -62,6 +62,23 @@ class FootballMatch extends Model
         return $this->hasMany(MatchEvent::class, 'match_id');
     }
 
+    public function lineups(): HasMany
+    {
+        return $this->hasMany(MatchLineup::class, 'match_id');
+    }
+
+    public function homeLineups(): HasMany
+    {
+        return $this->hasMany(MatchLineup::class, 'match_id')
+            ->where('team_id', $this->home_team);
+    }
+
+    public function awayLineups(): HasMany
+    {
+        return $this->hasMany(MatchLineup::class, 'match_id')
+            ->where('team_id', $this->away_team);
+    }
+
     public function brackets(): HasMany
     {
         return $this->hasMany(Bracket::class, 'match_id');

@@ -27,6 +27,8 @@ Route::get('/teams', [TeamController::class, 'index']);
 Route::get('/teams/{team}', [TeamController::class, 'show']);
 Route::get('/matches', [MatchController::class, 'index']);
 Route::get('/matches/{match}', [MatchController::class, 'show']);
+Route::get('/matches/{match}/lineups', [MatchController::class, 'getLineups']);
+Route::get('/matches/{match}/events', [MatchController::class, 'getEvents']);
 Route::get('/standings', [StandingController::class, 'index']);
 Route::get('/standings/tournament/{tournamentId}', [StandingController::class, 'byTournament']);
 Route::get('/standings/group/{groupId}', [StandingController::class, 'byGroup']);
@@ -81,6 +83,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::patch('/matches/{match}/start-live', [MatchController::class, 'startLive']);
         Route::patch('/matches/{match}/finish', [MatchController::class, 'finish']);
         Route::post('/matches/{match}/events', [MatchController::class, 'addEvent']);
+        Route::patch('/matches/{match}', [MatchController::class, 'update']);
+        Route::patch('/matches/{match}/schedule', [MatchController::class, 'schedule']);
+        Route::post('/matches/{match}/lineups', [MatchController::class, 'registerLineup']);
+        Route::post('/matches/{match}/events', [MatchController::class, 'registerEvent']);
+        Route::post('/matches/{match}/substitutions', [MatchController::class, 'registerSubstitution']);
     });
     
     // Standing routes - Admin only for recalculate

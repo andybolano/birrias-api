@@ -540,7 +540,7 @@ class TournamentController extends Controller
      *     path="/api/tournaments/{id}/generate-fixtures",
      *     tags={"Tournaments"},
      *     summary="Generar fixture del torneo",
-     *     description="Genera automáticamente los partidos del torneo basado en los equipos inscritos y el formato (solo admin propietario)",
+     *     description="Genera automáticamente los partidos del torneo organizados por fechas/jornadas. Usa algoritmo Round Robin para asegurar que ningún equipo juegue más de una vez por fecha (solo admin propietario)",
      *     security={{"apiAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -551,12 +551,13 @@ class TournamentController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Fixture generado exitosamente",
+     *         description="Fixture generado exitosamente organizando partidos por fechas",
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="string", example="Fixture generated successfully"),
      *             @OA\Property(property="matches_created", type="integer", example=15),
      *             @OA\Property(property="total_rounds", type="integer", example=5),
-     *             @OA\Property(property="format", type="string", example="league")
+     *             @OA\Property(property="format", type="string", example="league"),
+     *             @OA\Property(property="dates_organization", type="string", example="Partidos organizados por fechas usando algoritmo Round Robin")
      *         )
      *     ),
      *     @OA\Response(
@@ -616,6 +617,12 @@ class TournamentController extends Controller
                 $result = $this->generateGroupsKnockoutFixtures($tournament, $teams);
                 break;
                 
+            case 'custom':
+                // Para formato custom, usamos la generación de liga simple por defecto
+                // Los usuarios pueden configurar fases dinámicas después si lo necesitan
+                $result = $this->generateLeagueFixtures($tournament, $teams);
+                break;
+                
             default:
                 return response()->json([
                     'message' => 'Unsupported tournament format: ' . $tournament->format
@@ -626,7 +633,9 @@ class TournamentController extends Controller
             'message' => 'Fixture generated successfully',
             'matches_created' => $result['matches_created'],
             'total_rounds' => $result['total_rounds'],
-            'format' => $tournament->format
+            'format' => $tournament->format,
+            'organization' => 'Partidos organizados por fechas/jornadas para facilitar la programación de calendarios',
+            'note' => 'Cada fecha/ronda contiene partidos donde ningún equipo juega más de una vez'
         ]);
     }
     
@@ -643,41 +652,89 @@ class TournamentController extends Controller
         $matchesCreated = 0;
         $currentRound = 1;
         
-        // Generar todas las combinaciones posibles
+        // Generar fixture usando algoritmo Round Robin para organizar por fechas
         for ($round = 1; $round <= $rounds; $round++) {
-            for ($i = 0; $i < $teamCount; $i++) {
-                for ($j = $i + 1; $j < $teamCount; $j++) {
-                    // Partido de ida
+            $fixtures = $this->generateRoundRobinFixtures($teamIds, $homeAway);
+            
+            foreach ($fixtures as $dateIndex => $dateMatches) {
+                foreach ($dateMatches as $match) {
                     \App\Models\FootballMatch::create([
                         'tournament_id' => $tournament->id,
                         'round' => $currentRound,
-                        'home_team' => $teamIds[$i],
-                        'away_team' => $teamIds[$j],
+                        'home_team' => $match['home'],
+                        'away_team' => $match['away'],
                         'status' => 'scheduled'
                     ]);
                     $matchesCreated++;
-                    
-                    // Partido de vuelta si está habilitado
-                    if ($homeAway) {
-                        \App\Models\FootballMatch::create([
-                            'tournament_id' => $tournament->id,
-                            'round' => $currentRound + 1,
-                            'home_team' => $teamIds[$j],
-                            'away_team' => $teamIds[$i],
-                            'status' => 'scheduled'
-                        ]);
-                        $matchesCreated++;
-                    }
                 }
+                $currentRound++;
             }
-            
-            $currentRound += $homeAway ? 2 : 1;
         }
         
         return [
             'matches_created' => $matchesCreated,
             'total_rounds' => $currentRound - 1
         ];
+    }
+    
+    /**
+     * Genera fixtures usando algoritmo Round Robin organizando por fechas
+     * Cada fecha tendrá partidos donde ningún equipo juega más de una vez
+     */
+    private function generateRoundRobinFixtures($teamIds, $homeAway = false)
+    {
+        $teamCount = count($teamIds);
+        $fixtures = [];
+        
+        // Si el número de equipos es impar, agregar un "bye" (descanso)
+        if ($teamCount % 2 !== 0) {
+            $teamIds[] = null; // null representa el "bye"
+            $teamCount++;
+        }
+        
+        $totalRounds = $teamCount - 1;
+        $matchesPerRound = $teamCount / 2;
+        
+        // Algoritmo Round Robin clásico
+        for ($round = 0; $round < $totalRounds; $round++) {
+            $fixtures[$round] = [];
+            
+            for ($match = 0; $match < $matchesPerRound; $match++) {
+                $home = $teamIds[$match];
+                $away = $teamIds[$teamCount - 1 - $match];
+                
+                // Saltar si uno de los equipos es "bye" (null)
+                if ($home === null || $away === null) {
+                    continue;
+                }
+                
+                $fixtures[$round][] = [
+                    'home' => $home,
+                    'away' => $away
+                ];
+                
+                // Si es ida y vuelta, agregar el partido de vuelta en otra fecha
+                if ($homeAway) {
+                    // Buscar la fecha correspondiente para el partido de vuelta
+                    $returnRound = $round + $totalRounds;
+                    if (!isset($fixtures[$returnRound])) {
+                        $fixtures[$returnRound] = [];
+                    }
+                    
+                    $fixtures[$returnRound][] = [
+                        'home' => $away,
+                        'away' => $home
+                    ];
+                }
+            }
+            
+            // Rotar equipos para la siguiente fecha (excepto el primero)
+            $first = array_shift($teamIds);
+            $last = array_pop($teamIds);
+            array_unshift($teamIds, $first, $last);
+        }
+        
+        return $fixtures;
     }
     
     /**
@@ -868,7 +925,7 @@ class TournamentController extends Controller
      *     path="/api/tournaments/{id}/fixtures",
      *     tags={"Tournaments"},
      *     summary="Obtener fixture del torneo",
-     *     description="Obtiene todos los partidos del torneo organizados por ronda",
+     *     description="Obtiene todos los partidos del torneo organizados por fechas/jornadas (rounds). Cada fecha contiene partidos donde ningún equipo juega más de una vez.",
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -879,7 +936,7 @@ class TournamentController extends Controller
      *     @OA\Parameter(
      *         name="round",
      *         in="query",
-     *         description="Filtrar por ronda específica",
+     *         description="Filtrar por fecha/jornada específica",
      *         required=false,
      *         @OA\Schema(type="integer", example=1)
      *     ),
@@ -952,12 +1009,12 @@ class TournamentController extends Controller
                             'home_team' => [
                                 'id' => $match->homeTeam->id,
                                 'name' => $match->homeTeam->name,
-                                'shield' => $match->homeTeam->shield ? url('storage/' . $match->homeTeam->shield) : null
+                                'shield' => $match->homeTeam->shield
                             ],
                             'away_team' => [
                                 'id' => $match->awayTeam->id,
                                 'name' => $match->awayTeam->name,
-                                'shield' => $match->awayTeam->shield ? url('storage/' . $match->awayTeam->shield) : null
+                                'shield' => $match->awayTeam->shield
                             ],
                             'match_date' => $match->match_date,
                             'venue' => $match->venue,
@@ -974,9 +1031,9 @@ class TournamentController extends Controller
 
             return [
                 'phase_id' => $phaseId,
-                'phase_name' => $phase ? $phase->name : 'Sin Fase',
-                'phase_type' => $phase ? $phase->type : null,
-                'phase_number' => $phase ? $phase->phase_number : 0,
+                'phase_name' => $phase ? $phase->name : 'Fixture Legado',
+                'phase_type' => $phase ? $phase->type : 'legacy',
+                'phase_number' => $phase ? $phase->phase_number : 1,
                 'total_matches' => $phaseMatches->count(),
                 'total_rounds' => $phaseMatches->max('round') ?? 0,
                 'rounds' => $rounds

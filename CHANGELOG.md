@@ -2,6 +2,106 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [2.2.1] - 2025-05-29
+
+### 🎯 Mejora en Organización de Fixtures por Fechas
+
+#### Nueva Organización Round Robin
+- ✅ **Algoritmo Round Robin**: Implementado para organizar partidos por fechas/jornadas
+- ✅ **Un partido por equipo por fecha**: Ningún equipo juega más de una vez en la misma fecha
+- ✅ **Distribución equilibrada**: Partidos balanceados en cada jornada
+- ✅ **Facilidad de programación**: Calendarios independientes por fecha
+
+#### Beneficios del Nuevo Sistema
+**Para Administradores**
+- ✅ **Fechas organizadas**: Fecha 1, Fecha 2, Fecha 3, etc. claramente diferenciadas
+- ✅ **Programación independiente**: Asignar calendarios por fecha de forma individual
+- ✅ **Balance perfecto**: Cada equipo descansa equitativamente
+- ✅ **Menos conflictos**: Equipos no juegan múltiples partidos el mismo día
+
+**Para Equipos**
+- ✅ **Tiempo de preparación**: Saben exactamente cuándo juegan cada fecha
+- ✅ **Descansos balanceados**: Tiempo equitativo entre partidos
+- ✅ **Planificación clara**: Pueden organizar entrenamientos y logística
+- ✅ **Prevención de fatiga**: Un solo partido por jornada
+
+#### Algoritmo Round Robin Implementado
+```javascript
+// Ejemplo para 6 equipos (A, B, C, D, E, F):
+// Fecha 1: A vs F, B vs E, C vs D
+// Fecha 2: A vs E, F vs D, B vs C  
+// Fecha 3: A vs D, E vs C, F vs B
+// Fecha 4: A vs C, D vs B, E vs F
+// Fecha 5: A vs B, C vs F, D vs E
+```
+
+#### Soporte para Ida y Vuelta
+- ✅ **Vuelta automática**: Si `home_away = true`, se generan partidos de vuelta
+- ✅ **Fechas adicionales**: Vuelta en fechas posteriores manteniendo el equilibrio
+- ✅ **Inversión de localía**: Local y visitante intercambiados en la vuelta
+
+### 🔧 Cambios Técnicos
+
+#### Método generateLeagueFixtures()
+- ✅ **Nuevo algoritmo** `generateRoundRobinFixtures()` 
+- ✅ **Organización por fechas** en lugar de secuencial
+- ✅ **Manejo de números impares** con "bye" automático
+- ✅ **Rotación de equipos** para distribución equitativa
+
+#### Documentación API Actualizada
+- ✅ **Swagger mejorado** con descripción del algoritmo Round Robin
+- ✅ **Respuestas enriquecidas** con información de organización
+- ✅ **Parámetros clarificados** (round = fecha/jornada)
+
+### 🎮 Casos de Uso Mejorados
+
+#### Ejemplo Práctico: Liga de 8 Equipos
+```bash
+# Generar fixture organizando por fechas
+POST /api/tournaments/{id}/generate-fixtures
+
+# Resultado: 7 fechas balanceadas
+# Fecha 1: 4 partidos (8 equipos, todos juegan)
+# Fecha 2: 4 partidos (8 equipos, todos juegan)
+# ...
+# Fecha 7: 4 partidos (8 equipos, todos juegan)
+
+# Ahora se puede asignar calendario independiente:
+# Fecha 1 -> Sábado 15 de junio
+# Fecha 2 -> Domingo 23 de junio  
+# Fecha 3 -> Sábado 29 de junio
+```
+
+#### Gestión de Calendarios
+- ✅ **Programación por fecha**: Asignar día específico a cada jornada
+- ✅ **Flexibilidad total**: Diferentes días para cada fecha
+- ✅ **Control granular**: Modificar horarios por fecha independientemente
+- ✅ **Prevención de conflictos**: Un equipo = un partido por fecha
+
+### 🚀 Próximas Mejoras
+
+#### Funcionalidades Planificadas
+- 🔮 **Asignación automática de fechas**: Configurar calendario completo automáticamente
+- 🔮 **Restricciones de disponibilidad**: Considerar días no disponibles
+- 🔮 **Optimización geográfica**: Minimizar distancias de viaje
+- 🔮 **Notificaciones por fecha**: Alertas específicas por jornada
+
+### 🐛 Correcciones
+
+#### Fix de Restricción ENUM en Campo Format
+- ✅ **Error SQL resuelto**: Solucionado error `CHECK constraint failed: format`
+- ✅ **Valor 'custom' agregado**: El ENUM de format ahora incluye 'custom' como opción válida
+- ✅ **Compatibilidad SQLite**: Migración optimizada para SQLite que no soporta ALTER ENUM
+- ✅ **Preservación de datos**: Todos los datos existentes mantenidos durante la migración
+
+#### Detalles Técnicos
+- **Problema**: El ENUM format solo permitía `['league', 'league_playoffs', 'groups_knockout']`
+- **Solución**: Agregado `'custom'` al ENUM con valor por defecto
+- **Migración**: `2025_06_06_030739_add_custom_format_to_tournaments_table.php`
+- **Efecto**: Ahora se pueden crear torneos con formato `'custom'` sin errores
+
+---
+
 ## [2.2.0] - 2025-05-29
 
 ### 🎯 Sistema de Estados de Fases

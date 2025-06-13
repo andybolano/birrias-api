@@ -20,7 +20,7 @@ return new class extends Migration
             $table->timestampTz('match_date')->nullable();
             $table->string('venue')->nullable();
             $table->string('stream_url')->nullable();
-            $table->enum('status', ['scheduled', 'live', 'finished'])->default('scheduled');
+            $table->enum('status', ['created', 'scheduled', 'live', 'finished'])->default('created');
             $table->integer('home_score')->default(0);
             $table->integer('away_score')->default(0);
             $table->timestamps();

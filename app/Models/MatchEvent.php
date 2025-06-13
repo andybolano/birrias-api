@@ -10,11 +10,17 @@ class MatchEvent extends Model
 {
     use HasUuids;
 
+    const TYPE_GOAL = 'goal';
+    const TYPE_YELLOW_CARD = 'yellow_card';
+    const TYPE_RED_CARD = 'red_card';
+    const TYPE_BLUE_CARD = 'blue_card';
+    const TYPE_SUBSTITUTION = 'substitution';
+
     protected $fillable = [
         'match_id',
         'player_id',
-        'team_id',
-        'event_type',
+        'substitute_player_id',
+        'type',
         'minute',
         'description'
     ];
@@ -33,8 +39,19 @@ class MatchEvent extends Model
         return $this->belongsTo(Player::class);
     }
 
-    public function team(): BelongsTo
+    public function substitutePlayer(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Player::class, 'substitute_player_id');
+    }
+
+    public static function getAvailableTypes(): array
+    {
+        return [
+            self::TYPE_GOAL,
+            self::TYPE_YELLOW_CARD,
+            self::TYPE_RED_CARD,
+            self::TYPE_BLUE_CARD,
+            self::TYPE_SUBSTITUTION
+        ];
     }
 }
