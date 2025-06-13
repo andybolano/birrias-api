@@ -109,3 +109,6 @@ Route::get('/health', function () {
         'service' => 'Birrias API'
     ]);
 });
+
+// Include authentication routes
+require __DIR__.'/auth.php';

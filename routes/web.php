@@ -51,4 +51,4 @@ Route::get('/docs/api-docs.json', function () {
     return response()->json(['error' => 'Documentation not found'], 404);
 })->name('swagger.docs.json');
 
-require __DIR__.'/auth.php';
+// Auth routes are now included in API routes only
