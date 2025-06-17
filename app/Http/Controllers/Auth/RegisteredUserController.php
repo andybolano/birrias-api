@@ -22,8 +22,8 @@ class RegisteredUserController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"name","email","password","password_confirmation"},
-     *             @OA\Property(property="name", type="string", example="Juan Pérez"),
+     *             required={"fullname","email","password","password_confirmation"},
+     *             @OA\Property(property="fullname", type="string", example="Juan Pérez"),
      *             @OA\Property(property="email", type="string", format="email", example="juan@birrias.com"),
      *             @OA\Property(property="password", type="string", format="password", example="password"),
      *             @OA\Property(property="password_confirmation", type="string", format="password", example="password")
@@ -51,13 +51,13 @@ class RegisteredUserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'fullname' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
+            'fullname' => $request->fullname,
             'email' => $request->email,
             'password' => Hash::make($request->string('password')),
             'role' => 'admin', // Por defecto todos los usuarios son admin
